@@ -1,6 +1,7 @@
 package routers
 
 import (
+	"gin-blog/src/gin-blog/middleware/jwt"
 	"gin-blog/src/gin-blog/pkg/setting"
 	"gin-blog/src/gin-blog/routers/api"
 
@@ -22,7 +23,10 @@ func InitRouter() *gin.Engine {
 		})
 	})
 
+	r.GET("/auth", api.GetAuth)
+
 	apirouter := r.Group("/api")
+	apirouter.Use(jwt.JWT())
 	{
 		//标签
 		apirouter.GET("/tags", api.GetTags)

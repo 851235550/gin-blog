@@ -132,80 +132,94 @@ func AddArticle(c *gin.Context) {
 //修改文章
 func EditArticle(c *gin.Context) {
 	articleId := com.StrTo(c.Param("article_id")).MustInt()
-	//log.Printf("ID=======%d", articleId)
-	valid := validation.Validation{}
-	valid.Min(articleId, 1, "article_id").Message("文章ID必须大于0")
-	var state = -1
-	if arg := c.Query("state"); arg != "" {
-		valid.Range(arg, 0, 1, "state").Message("状态只能为0或者1")
-		state = com.StrTo(arg).MustInt()
+	code := e.INVALID_PARAMS
+	if articleId <= 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"code": code,
+			"msg":  e.GetMsg(code),
+			"data": make(map[string]interface{}),
+		})
+		return
 	}
-	var tagId = -1
-	if arg := c.Query("tag_id"); arg != "" {
-		//valid.Min(tagId, 1, "tag_id").Message("标签ID不能为空")
-		tagId = com.StrTo(arg).MustInt()
-	}
-	var cover string
-	if arg := c.Query("cover"); arg != "0" {
-		cover = arg
-	}
-	var title, desc, detail string
-	if arg := c.Query("title"); arg != "" {
-		title = arg
-		valid.MaxSize(title, 100, "title").Message("标题最长100个字")
-		valid.MinSize(title, 1, "title").Message("文章标题不能为空")
-	}
-	if arg := c.Query("desc"); arg != "" {
-		desc = arg
-		valid.MinSize(desc, 20, "desc").Message("文章简述最少20个字符")
-		valid.MaxSize(desc, 200, "desc").Message("文章简述最多200个字符")
-	}
-	if arg := c.Query("detail"); arg != "" {
-		detail = arg
-		valid.MinSize(detail, 300, "detail").Message("文章详情最少300个字符")
-		valid.MaxSize(detail, 65535, "detail").Message("文章详情最少65535个字符")
+	if !models.ExistArticleById(articleId) {
+		code := e.ERROR_NOT_EXIST_ARTICLE
+		c.JSON(http.StatusOK, gin.H{
+			"code": code,
+			"msg":  e.GetMsg(code),
+			"data": make(map[string]interface{}),
+		})
+		return
 	}
 
-	code := e.INVALID_PARAMS
+	tagId := com.StrTo(c.PostForm("tag_id")).MustInt()
+	title := c.PostForm("title")
+	cover := c.PostForm("cover")
+	desc := c.PostForm("desc")
+	detail := c.PostForm("detail")
+	state := com.StrTo(c.PostForm("state")).MustInt()
+
 	data := make(map[string]interface{})
-	if !valid.HasErrors() {
-		if !models.ExistArticleById(articleId) {
-			code = e.ERROR_NOT_EXIST_ARTICLE
+	if tagId > 0 {
+		if !models.ExistTagByTagId(tagId) {
+			code := e.ERROR_NOT_EXIST_TAG
 			c.JSON(http.StatusOK, gin.H{
 				"code": code,
 				"msg":  e.GetMsg(code),
-				"data": data,
+				"data": make(map[string]interface{}),
 			})
+			return
 		}
-		if tagId <= 0 && !models.ExistTagByTagId(tagId) {
-			code = e.ERROR_NOT_EXIST_TAG
+		data["tag_id"] = tagId
+	}
+	if len(title) > 0 {
+		if len(title) > 100 || len(title) == 0 {
 			c.JSON(http.StatusOK, gin.H{
 				"code": code,
 				"msg":  e.GetMsg(code),
-				"data": data,
+				"data": make(map[string]interface{}),
 			})
-		}
-		if title != "" {
+			return
+		} else {
 			data["title"] = title
 		}
-		if desc != "" {
+	}
+	// 没有好办法判断是否传如cover参数，所以如果不想修改数据库中cover的值，前端需传入"-1"
+	if cover != "-1" {
+		data["cover"] = cover
+	}
+	if len(desc) > 0 {
+		if len(desc) > 200 || len(desc) == 0 {
+			c.JSON(http.StatusOK, gin.H{
+				"code": code,
+				"msg":  e.GetMsg(code),
+				"data": make(map[string]interface{}),
+			})
+			return
+		} else {
 			data["desc"] = desc
 		}
-		if detail != "" {
+	}
+	if len(detail) > 0 {
+		if len(detail) > 200 || len(detail) == 0 {
+			c.JSON(http.StatusOK, gin.H{
+				"code": code,
+				"msg":  e.GetMsg(code),
+				"data": make(map[string]interface{}),
+			})
+			return
+		} else {
 			data["detail"] = detail
 		}
-		if state >= 0 {
-			data["state"] = state
-		}
-		data["cover"] = cover
-		models.EditArticle(articleId, data)
-		code = e.SUCCESS
-	} else {
-		for _, err := range valid.Errors {
-			log.Printf("err.key: %s, err.msg: %s", err.Key, err.Message)
-		}
+	}
+	//同cover
+	if state != -1 {
+		data["state"] = state
 	}
 
+	models.EditArticle(articleId, data)
+	code = e.SUCCESS
+	//code = 1
+	//msg := ""
 	c.JSON(http.StatusOK, gin.H{
 		"code": code,
 		"msg":  e.GetMsg(code),
